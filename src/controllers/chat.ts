@@ -6,14 +6,13 @@ import axios from "axios";
 import { io, getReceiverSocketId } from "../config/socket.js";
 
 
-// tạo đoạn chát mới 
 export const createNewChat = TryCatch(
     async (req: AuthenticatedRequest, res) => {
         const userId = req.user?._id;
         const { otherUserId } = req.body;
 
         if (!otherUserId) {
-            res.status(400).json({ message: "otherUserId is required" });
+            res.status(400).json({ message: "Cần cung cấp otherUserId " });
             return;
         }
 
@@ -21,10 +20,10 @@ export const createNewChat = TryCatch(
             users: { $all: [userId, otherUserId], $size: 2 },
         });
 
-        // tồn tịa thì trả về cũ
+        // tồn tại thì trả về cũ
         if (existingChat) {
             res.json({
-                message: "Chat already exists",
+                message: "Cuộc trò chuyện đã tồn tại",
                 chatId: existingChat._id,
             });
             return;
@@ -32,17 +31,18 @@ export const createNewChat = TryCatch(
 
         // tạo chat mới
         res.status(201).json({
-            message: "New chat created",
+            message: "Tạo cuộc trò chuyện mới thành công",
             chatId: (await Chat.create({ users: [userId, otherUserId] }))._id,
         });
 
     }
 );
 
+
 export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
     const userId = req.user?._id;
     if (!userId) {
-        res.status(400).json({ message: "User ID is required" });
+        res.status(400).json({ message: "Cần cung cấp ID người dùng" });
         return;
     }
     const chats = await Chat.find({ users: userId }).sort({ updatedAt: -1 });
@@ -83,6 +83,7 @@ export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
     });
 });
 
+
 export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
     const senderId = req.user?._id;
     const { chatId, text } = req.body;
@@ -93,24 +94,24 @@ export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
 
 
     if (!senderId) {
-        res.status(401).json({ message: "Unauthorized" });
+        res.status(401).json({ message: "Không có quyền truy cập" });
         return;
     }
 
     if (!chatId) {
-        res.status(400).json({ message: "chatId is required" });
+        res.status(400).json({ message: "Cần cung cấp chatId (ID cuộc trò chuyện)" });
         return;
     }
 
     if (!text && !imageFile) {
-        res.status(400).json({ message: "Either text or image is required to send a message" });
+        res.status(400).json({ message: "Cần có văn bản hoặc hình ảnh để gửi tin nhắn" });
         return;
     }
 
     const chat = await Chat.findById(chatId);
 
     if (!chat) {
-        res.status(404).json({ message: "Chat not found" });
+        res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện" });
         return;
     }
 
@@ -119,7 +120,7 @@ export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
     );
 
     if (!isUserInChat) {
-        res.status(403).json({ message: "You are not a participant of this chat" });
+        res.status(403).json({ message: "Bạn không tham gia vào cuộc trò chuyện này" });
         return;
     }
 
@@ -128,7 +129,7 @@ export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
     );
 
     if (!otherUserId) {
-        res.status(401).json({ message: "No other user" });
+        res.status(401).json({ message: "Không tìm thấy người dùng khác" });
         return;
     }
 
@@ -189,18 +190,18 @@ export const getMessagesByChat = TryCatch(
         const userId = req.user?._id;
         const { chatId } = req.params;
         if (!userId) {
-            res.status(401).json({ message: "Unauthorized" });
+            res.status(401).json({ message: "Không có quyền truy cập" });
             return;
         }
         if (!chatId) {
-            res.status(400).json({ message: "chatId is required" });
+            res.status(400).json({ message: "Cần cung cấp chatId (ID cuộc trò chuyện)" });
             return;
         }
 
         const chat = await Chat.findById(chatId);
 
         if (!chat) {
-            res.status(404).json({ message: "chat not found" });
+            res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện" });
             return;
         }
 
@@ -209,7 +210,7 @@ export const getMessagesByChat = TryCatch(
         );
 
         if (!isUserInChat) {
-            res.status(403).json({ message: "You are not a participant of this chat" });
+            res.status(403).json({ message: "Bạn không tham gia vào cuộc trò chuyện này" });
             return;
         }
 
@@ -239,7 +240,7 @@ export const getMessagesByChat = TryCatch(
             const { data } = await axios.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`);
 
             if (!otherUserId) {
-                res.status(400).json({ message: "No other user" });
+                res.status(400).json({ message: "Không tìm thấy người dùng khác" });
                 return;
             }
 
