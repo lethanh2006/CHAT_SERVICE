@@ -10,7 +10,7 @@ dotenv.config();
 connectDb();
 app.use(express.json());
 app.use(cors());
-app.use('/api/v1', chatRoutes);
+app.use('/api/chat', chatRoutes);
 const swaggerSpec = swaggerJsdoc({
     definition: {
         openapi: '3.0.0',

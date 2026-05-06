@@ -6,6 +6,14 @@ import axios from "axios";
 import { io, getReceiverSocketId } from "../config/socket.js";
 
 
+const getUserFromUserService = async (userId: string) => {
+    const baseUrl = process.env.USER_SERVICE;
+    if (!baseUrl) throw new Error("USER_SERVICE is not configured");
+    const { data } = await axios.get(`${baseUrl}/api/user/user/${userId}`);
+    return data;
+};
+
+
 export const createNewChat = TryCatch(
     async (req: AuthenticatedRequest, res) => {
         const userId = req.user?._id;
@@ -56,9 +64,9 @@ export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
                 seen: false,
             });
             try {
-                const { data } = await axios.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`);
+                const otherUser = await getUserFromUserService(String(otherUserId));
                 return {
-                    users: data,
+                    user: otherUser,
                     chat: {
                         ...chat.toObject(),
                         latestMessage: chat.latestMessage || null,
@@ -237,7 +245,7 @@ export const getMessagesByChat = TryCatch(
         const otherUserId = chat.users.find((id) => id !== userId);
 
         try {
-            const { data } = await axios.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`);
+            const otherUser = await getUserFromUserService(String(otherUserId));
 
             if (!otherUserId) {
                 res.status(400).json({ message: "Không tìm thấy người dùng khác" });
@@ -248,7 +256,7 @@ export const getMessagesByChat = TryCatch(
 
             res.json({
                 messages,
-                user: data,
+                user: otherUser,
             });
         } catch (error) {
             console.log(error);
