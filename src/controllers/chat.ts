@@ -3,7 +3,7 @@ import type { AuthenticatedRequest } from "../middleware/isAuth.js";
 import { Chat } from "../models/Chat.js";
 import { Messages } from "../models/Messages.js";
 import axios from "axios";
-import { io, getReceiverSocketId } from "../config/socket.js";
+import { io, getReceiverSocketIds } from "../config/socket.js";
 
 
 const getUserFromUserService = async (userId: string) => {
@@ -21,6 +21,11 @@ export const createNewChat = TryCatch(
 
         if (!otherUserId) {
             res.status(400).json({ message: "Cần cung cấp otherUserId " });
+            return;
+        }
+
+        if (otherUserId.toString() === userId?.toString()) {
+            res.status(400).json({ message: "Không thể tạo cuộc trò chuyện với chính mình" });
             return;
         }
 
@@ -57,7 +62,7 @@ export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
 
     const chatWithUserData = await Promise.all(
         chats.map(async (chat) => {
-            const otherUserId = chat.users.find((id) => id !== userId);
+            const otherUserId = chat.users.find((id) => id.toString() !== userId.toString());
             const unseenCount = await Messages.countDocuments({
                 chatId: chat._id,
                 sender: { $ne: userId },
@@ -96,9 +101,6 @@ export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
     const senderId = req.user?._id;
     const { chatId, text } = req.body;
     const imageFile = req.file;
-
-
-    console.log("FILE:", req.file);
 
 
     if (!senderId) {
@@ -180,9 +182,9 @@ export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
 
     // Nếu người nhận đang online (có socket), emit "newMessage" để họ thấy tin ngay lập tức
     // mà không cần refresh hay polling
-    const receiverSocketId = getReceiverSocketId(otherUserId.toString());
-    if (receiverSocketId) {
-        io.to(receiverSocketId).emit("newMessage", {
+    const receiverSocketIds = getReceiverSocketIds(otherUserId.toString());
+    if (receiverSocketIds.length) {
+        io.to(receiverSocketIds).emit("newMessage", {
             message: savedMessage.toObject ? savedMessage.toObject() : savedMessage,
         });
     }
@@ -242,7 +244,15 @@ export const getMessagesByChat = TryCatch(
             createdAt: 1
         });
 
-        const otherUserId = chat.users.find((id) => id !== userId);
+        const senderIds = new Set(messagesToMarkSeen.map((message) => message.sender));
+        senderIds.forEach((senderId) => {
+            const socketIds = getReceiverSocketIds(senderId);
+            if (socketIds.length) {
+                io.to(socketIds).emit("messagesSeen", { chatId, seenBy: userId });
+            }
+        });
+
+        const otherUserId = chat.users.find((id) => id.toString() !== userId.toString());
 
         try {
             const otherUser = await getUserFromUserService(String(otherUserId));
@@ -258,6 +268,7 @@ export const getMessagesByChat = TryCatch(
                 messages,
                 user: otherUser,
             });
+
         } catch (error) {
             console.log(error);
             res.json({

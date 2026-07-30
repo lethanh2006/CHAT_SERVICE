@@ -6,6 +6,7 @@
 import { Server, Socket } from "socket.io";
 import http from "http";
 import express from "express";
+import jwt, {} from "jsonwebtoken";
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -14,40 +15,57 @@ const io = new Server(server, {
         methods: ["GET", "POST"]
     }
 });
-// Map lưu: userId -> socketId
-const userSocketMap = {};
+// Một tài khoản có thể mở đồng thời trên nhiều thiết bị/tab.
+const userSocketMap = new Map();
 // tìm socket của người nhận và gửi tin nhắn real-time
-export const getReceiverSocketId = (userId) => userSocketMap[userId];
+export const getReceiverSocketIds = (userId) => Array.from(userSocketMap.get(userId) ?? []);
+io.use((socket, next) => {
+    try {
+        const token = socket.handshake.auth?.token;
+        if (typeof token !== "string" || !process.env.JWT_SECRET) {
+            return next(new Error("Unauthorized"));
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.user?._id;
+        if (!userId)
+            return next(new Error("Unauthorized"));
+        socket.data.userId = String(userId);
+        next();
+    }
+    catch {
+        next(new Error("Unauthorized"));
+    }
+});
 io.on("connection", (socket) => {
     console.log("User Connected", socket.id);
-    const userId = socket.handshake.query.userId;
-    if (userId && userId !== "undefined") {
-        // Lưu vào map: userId -> socketId để gửi tin cho đúng user
-        userSocketMap[userId] = socket.id;
-        socket.data.userId = userId; // Lưu userId vào socket để dùng khi disconnect
-        console.log(`User ${userId} mapped to socket ${socket.id}`);
-    }
+    const userId = socket.data.userId;
+    const sockets = userSocketMap.get(userId) ?? new Set();
+    sockets.add(socket.id);
+    userSocketMap.set(userId, sockets);
     // Gửi danh sách user online cho tất cả client đang kết nối
-    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
     socket.on("typing", ({ chatId, targetUserId }) => {
-        const receiverSocketId = userSocketMap[targetUserId]; // Tìm socket của người nhận
+        const receiverSocketIds = getReceiverSocketIds(targetUserId);
         const senderUserId = socket.data.userId; // Người đang gõ
-        if (receiverSocketId && senderUserId) {
+        if (receiverSocketIds.length && senderUserId) {
             // Gửi event "userTyping" chỉ cho user B
-            io.to(receiverSocketId).emit("userTyping", { chatId, userId: senderUserId });
+            io.to(receiverSocketIds).emit("userTyping", { chatId, userId: senderUserId });
         }
     });
     socket.on("typingStop", ({ chatId, targetUserId }) => {
-        const receiverSocketId = userSocketMap[targetUserId];
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit("userTypingStop", { chatId });
+        const receiverSocketIds = getReceiverSocketIds(targetUserId);
+        if (receiverSocketIds.length) {
+            io.to(receiverSocketIds).emit("userTypingStop", { chatId });
         }
     });
     socket.on("disconnect", () => {
         const disconnectedUserId = socket.data.userId;
         if (disconnectedUserId) {
-            delete userSocketMap[disconnectedUserId]; // Xóa khỏi map
-            io.emit("getOnlineUsers", Object.keys(userSocketMap)); // Cập nhật danh sách online
+            const sockets = userSocketMap.get(disconnectedUserId);
+            sockets?.delete(socket.id);
+            if (!sockets?.size)
+                userSocketMap.delete(disconnectedUserId);
+            io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
         }
         console.log("User disconnected", socket.id);
     });

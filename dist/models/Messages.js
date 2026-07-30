@@ -4,7 +4,8 @@ const schema = new Schema({
     sender: { type: String, required: true },
     text: { type: String, required: false },
     image: {
-        url: { type: String, publicId: String },
+        url: { type: String },
+        publicId: { type: String },
     },
     messageType: { type: String, enum: ["text", "image"], default: "text" },
     seen: { type: Boolean, default: false },

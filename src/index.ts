@@ -6,6 +6,7 @@ import cors from "cors";
 import { app, server } from './config/socket.js';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import multer from 'multer';
 
 dotenv.config();
 
@@ -17,6 +18,18 @@ app.use(express.json());
 app.use(cors())
 
 app.use('/api/chat', chatRoutes);
+
+app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (error instanceof multer.MulterError) {
+    res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Ảnh không được vượt quá 5MB' : error.message });
+    return;
+  }
+  if (error instanceof Error) {
+    res.status(400).json({ message: error.message });
+    return;
+  }
+  next(error);
+});
 
 const swaggerSpec = swaggerJsdoc({
   definition: {

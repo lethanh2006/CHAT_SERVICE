@@ -3,7 +3,7 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 import dotenv from "dotenv";
 dotenv.config();
 
-interface IUser extends Document {
+export interface IUser extends Document {
     _id: string;
     name: string;
     email: string;
@@ -17,6 +17,18 @@ export interface AuthenticatedRequest extends Request {
 export const isAuth = async (req : AuthenticatedRequest, res: Response, next: NextFunction) :
     Promise<void> => {
     try { 
+        const gatewayPayload = req.headers["x-user-payload"];
+        if (typeof gatewayPayload === "string") {
+            const user = JSON.parse(Buffer.from(gatewayPayload, "base64").toString("utf8"));
+            if (!user?._id) {
+                res.status(401).json({ message: "Payload người dùng không hợp lệ" });
+                return;
+            }
+            req.user = user;
+            next();
+            return;
+        }
+
         const authHeader = req.headers.authorization;
 
         if(!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -30,7 +42,7 @@ export const isAuth = async (req : AuthenticatedRequest, res: Response, next: Ne
             res.status(401).json({ message: "Unauthorized" });
             return ;
         }
-        const { password, ...userWithoutPassword } = decodedValue.user;
+        const { password: _password, ...userWithoutPassword } = decodedValue.user;
         req.user = userWithoutPassword;
         next();
      }
