@@ -9,7 +9,7 @@ import { io, getReceiverSocketIds } from "../config/socket.js";
 const getUserFromUserService = async (userId: string) => {
     const baseUrl = process.env.USER_SERVICE;
     if (!baseUrl) throw new Error("USER_SERVICE is not configured");
-    const { data } = await axios.get(`${baseUrl}/api/user/user/${userId}`);
+    const { data } = await axios.get(`${baseUrl}/api/user/internal/${userId}`);
     return data;
 };
 
@@ -79,6 +79,11 @@ export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
                     }
                 };
             } catch (error) {
+                console.error("[CHAT][USER_LOOKUP] Không lấy được người dùng", {
+                    userId: String(otherUserId),
+                    status: axios.isAxiosError(error) ? error.response?.status : undefined,
+                    message: axios.isAxiosError(error) ? error.message : String(error),
+                });
                 return {
                     user: { _id: otherUserId, name: "Unknown User" },
                     chat: {
@@ -270,7 +275,12 @@ export const getMessagesByChat = TryCatch(
             });
 
         } catch (error) {
-            console.log(error);
+            console.error("[CHAT][USER_LOOKUP] Không lấy được người dùng của hội thoại", {
+                chatId,
+                userId: String(otherUserId),
+                status: axios.isAxiosError(error) ? error.response?.status : undefined,
+                message: axios.isAxiosError(error) ? error.message : String(error),
+            });
             res.json({
                 messages,
                 user: { _id: otherUserId, name: "unknown User" },
