@@ -4,6 +4,7 @@ import { Chat } from "../models/Chat.js";
 import { Messages } from "../models/Messages.js";
 import axios from "axios";
 import { io, getReceiverSocketIds } from "../config/socket.js";
+import mongoose from "mongoose";
 
 
 const getUserFromUserService = async (userId: string) => {
@@ -27,6 +28,21 @@ export const createNewChat = TryCatch(
         if (otherUserId.toString() === userId?.toString()) {
             res.status(400).json({ message: "Không thể tạo cuộc trò chuyện với chính mình" });
             return;
+        }
+
+        if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(otherUserId)) {
+            res.status(400).json({ message: "ID người dùng không hợp lệ" });
+            return;
+        }
+
+        try {
+            await getUserFromUserService(String(otherUserId));
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+                res.status(404).json({ message: "Không tìm thấy người dùng để tạo cuộc trò chuyện" });
+                return;
+            }
+            throw error;
         }
 
         const existingChat = await Chat.findOne({
@@ -115,6 +131,11 @@ export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
 
     if (!chatId) {
         res.status(400).json({ message: "Cần cung cấp chatId (ID cuộc trò chuyện)" });
+        return;
+    }
+
+    if (!mongoose.isValidObjectId(chatId)) {
+        res.status(400).json({ message: "chatId không hợp lệ" });
         return;
     }
 
@@ -210,6 +231,10 @@ export const getMessagesByChat = TryCatch(
         }
         if (!chatId) {
             res.status(400).json({ message: "Cần cung cấp chatId (ID cuộc trò chuyện)" });
+            return;
+        }
+        if (!mongoose.isValidObjectId(chatId)) {
+            res.status(400).json({ message: "chatId không hợp lệ" });
             return;
         }
 

@@ -16,7 +16,7 @@ export interface AuthenticatedRequest extends Request {
 
 export const isAuth = async (req : AuthenticatedRequest, res: Response, next: NextFunction) :
     Promise<void> => {
-    try { 
+    try {
         const gatewayPayload = req.headers["x-user-payload"];
         if (typeof gatewayPayload === "string") {
             const user = JSON.parse(Buffer.from(gatewayPayload, "base64").toString("utf8"));
@@ -42,7 +42,12 @@ export const isAuth = async (req : AuthenticatedRequest, res: Response, next: Ne
             res.status(401).json({ message: "Unauthorized" });
             return ;
         }
-        const { password: _password, ...userWithoutPassword } = decodedValue.user;
+        const decodedUser = decodedValue.user ?? decodedValue;
+        if (!decodedUser?._id) {
+            res.status(401).json({ message: "Token payload không hợp lệ" });
+            return;
+        }
+        const { password: _password, ...userWithoutPassword } = decodedUser;
         req.user = userWithoutPassword;
         next();
      }

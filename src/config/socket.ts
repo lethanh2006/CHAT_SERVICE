@@ -37,7 +37,8 @@ io.use((socket, next) => {
             return next(new Error("Unauthorized"));
         }
         const decoded = jwt.verify(token, process.env.JWT_SECRET) as JwtPayload;
-        const userId = decoded.user?._id;
+        const decodedUser = decoded.user ?? decoded;
+        const userId = decodedUser?._id ?? decodedUser?.userId ?? decodedUser?.id;
         if (!userId) return next(new Error("Unauthorized"));
         socket.data.userId = String(userId);
         next();
@@ -60,7 +61,9 @@ io.on("connection", (socket: Socket) => {
     io.emit("getOnlineUsers", Array.from(userSocketMap.keys()));
 
 
-    socket.on("typing", ({ chatId, targetUserId }: { chatId: string; targetUserId: string }) => {
+    socket.on("typing", (payload: { chatId?: unknown; targetUserId?: unknown } = {}) => {
+        const { chatId, targetUserId } = payload;
+        if (typeof chatId !== "string" || typeof targetUserId !== "string") return;
         const receiverSocketIds = getReceiverSocketIds(targetUserId);
         const senderUserId = socket.data.userId as string;      // Người đang gõ
         if (receiverSocketIds.length && senderUserId) {
@@ -70,7 +73,9 @@ io.on("connection", (socket: Socket) => {
     });
 
 
-    socket.on("typingStop", ({ chatId, targetUserId }: { chatId: string; targetUserId: string }) => {
+    socket.on("typingStop", (payload: { chatId?: unknown; targetUserId?: unknown } = {}) => {
+        const { chatId, targetUserId } = payload;
+        if (typeof chatId !== "string" || typeof targetUserId !== "string") return;
         const receiverSocketIds = getReceiverSocketIds(targetUserId);
         if (receiverSocketIds.length) {
             io.to(receiverSocketIds).emit("userTypingStop", { chatId });
