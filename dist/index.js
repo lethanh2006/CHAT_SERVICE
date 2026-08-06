@@ -11,6 +11,9 @@ dotenv.config();
 connectDb();
 app.use(express.json());
 app.use(cors());
+app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', service: 'chat' });
+});
 app.use('/api/chat', chatRoutes);
 app.use((error, _req, res, next) => {
     if (error instanceof multer.MulterError) {

@@ -17,6 +17,10 @@ app.use(express.json());
 
 app.use(cors())
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'chat' });
+});
+
 app.use('/api/chat', chatRoutes);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
