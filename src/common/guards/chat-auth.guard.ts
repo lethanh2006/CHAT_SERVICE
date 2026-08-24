@@ -8,12 +8,14 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import type { AuthenticatedUser } from "../interfaces/authenticated-user.interface";
 import type { RequestWithContext } from "../interfaces/request-context.interface";
+import { GatewaySignatureService } from "../security/gateway-signature.service";
 
 @Injectable()
 export class ChatAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly signatureService: GatewaySignatureService,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -21,6 +23,13 @@ export class ChatAuthGuard implements CanActivate {
     const gatewayPayload = request.headers["x-user-payload"];
 
     if (typeof gatewayPayload === "string") {
+      this.signatureService.assertTrusted({
+        context: `${request.method.toUpperCase()}:${request.path}`,
+        payload: gatewayPayload,
+        requestId: this.headerValue(request.headers["x-request-id"]),
+        signature: this.headerValue(request.headers["x-user-signature"]),
+        timestamp: this.headerValue(request.headers["x-user-timestamp"]),
+      });
       let parsed: unknown;
       try {
         parsed = JSON.parse(
@@ -81,5 +90,11 @@ export class ChatAuthGuard implements CanActivate {
     return typeof value === "object" && value !== null && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : null;
+  }
+
+  private headerValue(
+    value: string | string[] | undefined,
+  ): string | undefined {
+    return typeof value === "string" ? value : undefined;
   }
 }

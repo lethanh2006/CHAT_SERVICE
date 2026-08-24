@@ -10,6 +10,7 @@ import { ChatGateway } from "./chat.gateway";
 import { ChatImageService } from "./chat-image.service";
 import { ChatService } from "./chat.service";
 import { UserClientService } from "./user-client.service";
+import { GatewaySignatureService } from "../../common/security/gateway-signature.service";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { UserClientService } from "./user-client.service";
   controllers: [ChatController],
   providers: [
     ChatAuthGuard,
+    GatewaySignatureService,
     ChatGateway,
     ChatImageService,
     ChatService,
