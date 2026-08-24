@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -19,6 +18,7 @@ import type { RequestWithContext } from "../../common/interfaces/request-context
 import { ChatService } from "./chat.service";
 import { CreateChatDto } from "./dto/create-chat.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
+import { filterSupportedChatImage } from "./chat-image-upload";
 
 @Controller("api/chat")
 @UseGuards(ChatAuthGuard)
@@ -53,18 +53,8 @@ export class ChatController {
     FileInterceptor("image", {
       storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter: (_request, file, callback) => {
-        if (file.mimetype.startsWith("image/")) {
-          callback(null, true);
-          return;
-        }
-        callback(
-          new BadRequestException({
-            message: "Only image files are allowed!",
-          }),
-          false,
-        );
-      },
+      fileFilter: (_request, file, callback) =>
+        filterSupportedChatImage(file, callback),
     }),
   )
   sendMessage(
