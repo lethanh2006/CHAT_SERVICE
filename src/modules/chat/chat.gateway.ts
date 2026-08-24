@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
+import { withMessageSpan } from "@nrapp/observability";
 import {
   type OnGatewayConnection,
   type OnGatewayDisconnect,
@@ -44,6 +45,9 @@ export class ChatGateway
         const token: unknown = socket.handshake.auth?.token;
         const secret = this.configService.get<string>("JWT_SECRET");
         if (typeof token !== "string" || !secret) {
+          this.logger.info("socket_handshake_rejected", {
+            reason: "missing_credentials",
+          });
           next(new Error("Unauthorized"));
           return;
         }
@@ -55,61 +59,84 @@ export class ChatGateway
         const candidate = nestedUser ?? decoded;
         const userId = candidate._id ?? candidate.userId ?? candidate.id;
         if (typeof userId !== "string" || userId.length === 0) {
+          this.logger.info("socket_handshake_rejected", {
+            reason: "invalid_identity",
+          });
           next(new Error("Unauthorized"));
           return;
         }
         (socket.data as Record<string, unknown>).userId = userId;
         next();
       } catch {
+        this.logger.info("socket_handshake_rejected", {
+          reason: "invalid_token",
+        });
         next(new Error("Unauthorized"));
       }
     });
   }
 
-  handleConnection(socket: Socket): void {
-    const userId = this.getSocketUserId(socket);
-    if (!userId) return;
-    const sockets = this.userSocketMap.get(userId) ?? new Set<string>();
-    sockets.add(socket.id);
-    this.userSocketMap.set(userId, sockets);
-    this.emitOnlineUsers();
-    this.logger.info("socket_connected", { userId, socketId: socket.id });
+  async handleConnection(socket: Socket): Promise<void> {
+    await this.withSocketEventSpan("connect", async () => {
+      const userId = this.getSocketUserId(socket);
+      if (!userId) return;
+      const sockets = this.userSocketMap.get(userId) ?? new Set<string>();
+      sockets.add(socket.id);
+      this.userSocketMap.set(userId, sockets);
+      this.emitOnlineUsers();
+      this.logger.info("socket_connected", { "user.id": userId });
+    });
   }
 
-  handleDisconnect(socket: Socket): void {
-    const userId = this.getSocketUserId(socket);
-    if (userId) {
-      const sockets = this.userSocketMap.get(userId);
-      sockets?.delete(socket.id);
-      if (!sockets?.size) this.userSocketMap.delete(userId);
-      this.emitOnlineUsers();
-    }
-    this.logger.info("socket_disconnected", { userId, socketId: socket.id });
+  async handleDisconnect(socket: Socket): Promise<void> {
+    await this.withSocketEventSpan("disconnect", async () => {
+      const userId = this.getSocketUserId(socket);
+      if (userId) {
+        const sockets = this.userSocketMap.get(userId);
+        sockets?.delete(socket.id);
+        if (!sockets?.size) this.userSocketMap.delete(userId);
+        this.emitOnlineUsers();
+      }
+      this.logger.info("socket_disconnected", {
+        ...(userId ? { "user.id": userId } : {}),
+      });
+    });
   }
 
   @SubscribeMessage("typing")
-  handleTyping(socket: Socket, payload: TypingPayload = {}): void {
-    const { chatId, targetUserId } = payload;
-    if (typeof chatId !== "string" || typeof targetUserId !== "string") return;
+  async handleTyping(socket: Socket, payload: TypingPayload = {}): Promise<void> {
+    await this.withSocketEventSpan("typing", async () => {
+      const { chatId, targetUserId } = payload;
+      if (typeof chatId !== "string" || typeof targetUserId !== "string") {
+        return;
+      }
 
-    const receiverSocketIds = this.getReceiverSocketIds(targetUserId);
-    const senderUserId = this.getSocketUserId(socket);
-    if (receiverSocketIds.length && senderUserId) {
-      this.server
-        .to(receiverSocketIds)
-        .emit("userTyping", { chatId, userId: senderUserId });
-    }
+      const receiverSocketIds = this.getReceiverSocketIds(targetUserId);
+      const senderUserId = this.getSocketUserId(socket);
+      if (receiverSocketIds.length && senderUserId) {
+        this.server
+          .to(receiverSocketIds)
+          .emit("userTyping", { chatId, userId: senderUserId });
+      }
+    });
   }
 
   @SubscribeMessage("typingStop")
-  handleTypingStop(_socket: Socket, payload: TypingPayload = {}): void {
-    const { chatId, targetUserId } = payload;
-    if (typeof chatId !== "string" || typeof targetUserId !== "string") return;
+  async handleTypingStop(
+    _socket: Socket,
+    payload: TypingPayload = {},
+  ): Promise<void> {
+    await this.withSocketEventSpan("typingStop", async () => {
+      const { chatId, targetUserId } = payload;
+      if (typeof chatId !== "string" || typeof targetUserId !== "string") {
+        return;
+      }
 
-    const receiverSocketIds = this.getReceiverSocketIds(targetUserId);
-    if (receiverSocketIds.length) {
-      this.server.to(receiverSocketIds).emit("userTypingStop", { chatId });
-    }
+      const receiverSocketIds = this.getReceiverSocketIds(targetUserId);
+      if (receiverSocketIds.length) {
+        this.server.to(receiverSocketIds).emit("userTypingStop", { chatId });
+      }
+    });
   }
 
   emitNewMessage(userId: string, message: unknown): void {
@@ -143,5 +170,17 @@ export class ChatGateway
     return typeof value === "object" && value !== null && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : null;
+  }
+
+  private async withSocketEventSpan(
+    eventName: string,
+    callback: () => Promise<void>,
+  ): Promise<void> {
+    await withMessageSpan(`socket.io ${eventName}`, {}, callback, {
+      attributes: {
+        "messaging.system": "socket.io",
+        "messaging.operation.name": eventName,
+      },
+    });
   }
 }

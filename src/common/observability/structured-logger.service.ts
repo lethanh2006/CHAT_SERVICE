@@ -1,29 +1,43 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import {
+  createAppLogger,
+  handleOriginHttpException,
+  type HttpBoundaryContext,
+  type HttpBoundaryResult,
+} from "@nrapp/observability";
 
 export type LogDetails = Record<string, unknown>;
 
+export const chatAppLogger: ReturnType<typeof createAppLogger> =
+  createAppLogger({ serviceName: "chat" });
+
 @Injectable()
 export class StructuredLoggerService {
-  private readonly logger = new Logger("Chat");
+  private readonly logger = chatAppLogger;
 
-  info(event: string, details: LogDetails): void {
-    this.logger.log(this.serialize(event, details));
+  info(event: string, details: LogDetails = {}): void {
+    this.logger.info({ ...details, "event.name": event }, event);
   }
 
-  warn(event: string, details: LogDetails): void {
-    this.logger.warn(this.serialize(event, details));
+  warn(event: string, details: LogDetails = {}): void {
+    this.logger.warn({ ...details, "event.name": event }, event);
   }
 
-  error(event: string, details: LogDetails, stack?: string): void {
-    this.logger.error(this.serialize(event, details), stack);
-  }
-
-  private serialize(event: string, details: LogDetails): string {
-    return JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: "chat",
+  error(event: string, details: LogDetails = {}, stack?: string): void {
+    this.logger.error(
+      {
+        ...details,
+        "event.name": event,
+        ...(stack ? { "exception.stacktrace": stack } : {}),
+      },
       event,
-      ...details,
-    });
+    );
+  }
+
+  handleHttpException(
+    exception: unknown,
+    context: HttpBoundaryContext,
+  ): HttpBoundaryResult {
+    return handleOriginHttpException(this.logger, exception, context);
   }
 }

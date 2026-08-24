@@ -1,22 +1,22 @@
 import {
   type ArgumentsHost,
+  BadRequestException,
   Catch,
   type ExceptionFilter,
-  HttpException,
-  HttpStatus,
   Injectable,
   PayloadTooLargeException,
 } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
+import { normalizeRouteTemplate } from "@nrapp/observability";
 import type { RequestContext } from "../interfaces/request-context.interface";
 import { StructuredLoggerService } from "../observability/structured-logger.service";
-import { toError } from "../utils/error.util";
 
 interface ErrorRequest {
   method?: string;
   originalUrl?: string;
   url?: string;
-  user?: { _id?: string };
+  baseUrl?: string;
+  route?: { path?: unknown };
   requestContext?: RequestContext;
 }
 
@@ -29,54 +29,33 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   ) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    const httpContext = host.switchToHttp();
-    const request = httpContext.getRequest<ErrorRequest>();
-    const error = toError(exception);
-    const uploadTooLarge = exception instanceof PayloadTooLargeException;
-    const statusCode = uploadTooLarge
-      ? HttpStatus.BAD_REQUEST
-      : exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
-    const requestId = request.requestContext?.requestId;
-
-    const logDetails = {
-      requestId,
-      userId: request.user?._id,
-      statusCode,
+    const http = host.switchToHttp();
+    const request = http.getRequest<ErrorRequest>();
+    const normalized =
+      exception instanceof PayloadTooLargeException
+        ? new BadRequestException({
+            code: "PAYLOAD_TOO_LARGE",
+            message: "Ảnh không được vượt quá 5MB",
+          })
+        : exception;
+    const result = this.logger.handleHttpException(normalized, {
+      requestId: request.requestContext?.requestId,
       method: request.method,
-      path: request.originalUrl ?? request.url,
-      errorName: error.name,
-      message: error.message,
-      durationMs: request.requestContext
-        ? Number(process.hrtime.bigint() - request.requestContext.startedAt) /
-          1e6
-        : undefined,
-    };
-    if (statusCode >= 500) {
-      this.logger.error("http_request_failed", logDetails, error.stack);
-    } else {
-      this.logger.warn("http_request_rejected", logDetails);
-    }
-
-    const exceptionResponse =
-      exception instanceof HttpException ? exception.getResponse() : null;
-    const responseBody = uploadTooLarge
-      ? { message: "Ảnh không được vượt quá 5MB", requestId }
-      : exceptionResponse !== null &&
-          typeof exceptionResponse === "object" &&
-          !Array.isArray(exceptionResponse)
-        ? { ...(exceptionResponse as Record<string, unknown>), requestId }
-        : {
-            message:
-              exceptionResponse ?? error.message ?? "Internal Server Error",
-            requestId,
-          };
+      route: this.routeOf(request),
+    });
 
     this.httpAdapterHost.httpAdapter.reply(
-      httpContext.getResponse(),
-      responseBody,
-      statusCode,
+      http.getResponse(),
+      result.body,
+      result.statusCode,
     );
+  }
+
+  private routeOf(request: ErrorRequest): string {
+    return typeof request.route?.path === "string"
+      ? normalizeRouteTemplate(
+          `${request.baseUrl ?? ""}${request.route.path}`,
+        )
+      : "unmatched";
   }
 }
