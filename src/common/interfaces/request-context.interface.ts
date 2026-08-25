@@ -3,7 +3,6 @@ import type { AuthenticatedUser } from "./authenticated-user.interface";
 
 export interface RequestContext {
   requestId: string;
-  startedAt: bigint;
 }
 
 export interface RequestWithContext extends Request {
