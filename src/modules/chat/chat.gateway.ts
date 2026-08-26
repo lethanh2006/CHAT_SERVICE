@@ -77,7 +77,7 @@ export class ChatGateway
   }
 
   async handleConnection(socket: Socket): Promise<void> {
-    await this.withSocketEventSpan('connect', async () => {
+    await this.withSocketEventSpan('connect', () => {
       const userId = this.getSocketUserId(socket);
       if (!userId) return;
       const sockets = this.userSocketMap.get(userId) ?? new Set<string>();
@@ -89,7 +89,7 @@ export class ChatGateway
   }
 
   async handleDisconnect(socket: Socket): Promise<void> {
-    await this.withSocketEventSpan('disconnect', async () => {
+    await this.withSocketEventSpan('disconnect', () => {
       const userId = this.getSocketUserId(socket);
       if (userId) {
         const sockets = this.userSocketMap.get(userId);
@@ -108,7 +108,7 @@ export class ChatGateway
     socket: Socket,
     payload: TypingPayload = {},
   ): Promise<void> {
-    await this.withSocketEventSpan('typing', async () => {
+    await this.withSocketEventSpan('typing', () => {
       const { chatId, targetUserId } = payload;
       if (typeof chatId !== 'string' || typeof targetUserId !== 'string') {
         return;
@@ -129,7 +129,7 @@ export class ChatGateway
     _socket: Socket,
     payload: TypingPayload = {},
   ): Promise<void> {
-    await this.withSocketEventSpan('typingStop', async () => {
+    await this.withSocketEventSpan('typingStop', () => {
       const { chatId, targetUserId } = payload;
       if (typeof chatId !== 'string' || typeof targetUserId !== 'string') {
         return;
@@ -177,7 +177,7 @@ export class ChatGateway
 
   private async withSocketEventSpan(
     eventName: string,
-    callback: () => Promise<void>,
+    callback: () => void,
   ): Promise<void> {
     await withMessageSpan(`socket.io ${eventName}`, {}, callback, {
       attributes: {
