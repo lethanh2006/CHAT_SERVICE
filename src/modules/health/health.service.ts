@@ -1,10 +1,10 @@
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
-import { InjectConnection } from "@nestjs/mongoose";
-import { ConnectionStates, type Connection } from "mongoose";
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { InjectConnection } from '@nestjs/mongoose';
+import { ConnectionStates, type Connection } from 'mongoose';
 
 export interface ChatHealth {
-  status: "ok";
-  service: "chat";
+  status: 'ok';
+  service: 'chat';
 }
 
 @Injectable()
@@ -14,17 +14,17 @@ export class HealthService {
   ) {}
 
   getLiveness(): ChatHealth {
-    return { status: "ok", service: "chat" };
+    return { status: 'ok', service: 'chat' };
   }
 
   getReadiness(): ChatHealth {
     if (this.mongoConnection.readyState !== ConnectionStates.connected) {
       throw new ServiceUnavailableException({
-        status: "error",
-        service: "chat",
-        dependencies: { mongodb: "down" },
+        status: 'error',
+        service: 'chat',
+        dependencies: { mongodb: 'down' },
       });
     }
-    return { status: "ok", service: "chat" };
+    return { status: 'ok', service: 'chat' };
   }
 }

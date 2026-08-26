@@ -3,12 +3,12 @@ import {
   type MiddlewareConsumer,
   Module,
   type NestModule,
-} from "@nestjs/common";
-import { APP_FILTER } from "@nestjs/core";
-import { GlobalExceptionFilter } from "../common/filters/global-exception.filter";
-import { RequestIdMiddleware } from "../common/middleware/request-id.middleware";
-import { StructuredLoggerService } from "../common/observability/structured-logger.service";
-import { TelemetryLifecycleService } from "../common/observability/telemetry-lifecycle.service";
+} from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
+import { RequestIdMiddleware } from '../common/middleware/request-id.middleware';
+import { StructuredLoggerService } from '../common/observability/structured-logger.service';
+import { TelemetryLifecycleService } from '../common/observability/telemetry-lifecycle.service';
 
 @Global()
 @Module({
@@ -24,6 +24,6 @@ import { TelemetryLifecycleService } from "../common/observability/telemetry-lif
 })
 export class CoreModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestIdMiddleware).forRoutes("*");
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
   }
 }

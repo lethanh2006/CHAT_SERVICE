@@ -1,4 +1,4 @@
-import { Schema, type HydratedDocument } from "mongoose";
+import { Schema, type HydratedDocument } from 'mongoose';
 
 export interface LatestMessage {
   text?: string;
@@ -23,7 +23,7 @@ export const ChatSchema = new Schema<Chat>(
     },
   },
   {
-    collection: "chats",
+    collection: 'chats',
     timestamps: true,
   },
 );

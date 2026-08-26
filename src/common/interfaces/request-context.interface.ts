@@ -1,5 +1,5 @@
-import type { Request } from "express";
-import type { AuthenticatedUser } from "./authenticated-user.interface";
+import type { Request } from 'express';
+import type { AuthenticatedUser } from './authenticated-user.interface';
 
 export interface RequestContext {
   requestId: string;

@@ -1,7 +1,7 @@
-import { HttpService } from "@nestjs/axios";
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { firstValueFrom } from "rxjs";
+import { HttpService } from '@nestjs/axios';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class UserClientService {
@@ -12,15 +12,15 @@ export class UserClientService {
 
   async getUser(userId: string, requestId?: string): Promise<unknown> {
     const baseUrl =
-      this.configService.get<string>("USER_SERVICE") ??
-      this.configService.get<string>("USER_SERVICE_URL");
-    if (!baseUrl) throw new Error("USER_SERVICE is not configured");
+      this.configService.get<string>('USER_SERVICE') ??
+      this.configService.get<string>('USER_SERVICE_URL');
+    if (!baseUrl) throw new Error('USER_SERVICE is not configured');
 
     const response = await firstValueFrom(
       this.httpService.get(
-        `${baseUrl.replace(/\/$/, "")}/api/user/internal/${encodeURIComponent(userId)}`,
+        `${baseUrl.replace(/\/$/, '')}/api/user/internal/${encodeURIComponent(userId)}`,
         {
-          headers: requestId ? { "x-request-id": requestId } : undefined,
+          headers: requestId ? { 'x-request-id': requestId } : undefined,
         },
       ),
     );

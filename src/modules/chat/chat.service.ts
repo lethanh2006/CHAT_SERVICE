@@ -4,19 +4,19 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
-} from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import axios from "axios";
-import { Types, type Model } from "mongoose";
-import type { AuthenticatedUser } from "../../common/interfaces/authenticated-user.interface";
-import { StructuredLoggerService } from "../../common/observability/structured-logger.service";
-import { Chat } from "../../schemas/chat.schema";
-import { Message, type MessageDocument } from "../../schemas/message.schema";
-import { ChatGateway } from "./chat.gateway";
-import { ChatImageService, type UploadedImage } from "./chat-image.service";
-import type { CreateChatDto } from "./dto/create-chat.dto";
-import type { SendMessageDto } from "./dto/send-message.dto";
-import { UserClientService } from "./user-client.service";
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import axios from 'axios';
+import { Types, type Model } from 'mongoose';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { StructuredLoggerService } from '../../common/observability/structured-logger.service';
+import { Chat } from '../../schemas/chat.schema';
+import { Message, type MessageDocument } from '../../schemas/message.schema';
+import { ChatGateway } from './chat.gateway';
+import { ChatImageService, type UploadedImage } from './chat-image.service';
+import type { CreateChatDto } from './dto/create-chat.dto';
+import type { SendMessageDto } from './dto/send-message.dto';
+import { UserClientService } from './user-client.service';
 
 export interface CreateChatResult {
   statusCode: 200 | 201;
@@ -47,12 +47,12 @@ export class ChatService {
 
     if (!otherUserId) {
       throw new BadRequestException({
-        message: "Cần cung cấp otherUserId ",
+        message: 'Cần cung cấp otherUserId ',
       });
     }
     if (otherUserId.toString() === userId?.toString()) {
       throw new BadRequestException({
-        message: "Không thể tạo cuộc trò chuyện với chính mình",
+        message: 'Không thể tạo cuộc trò chuyện với chính mình',
       });
     }
     if (
@@ -60,7 +60,7 @@ export class ChatService {
       !Types.ObjectId.isValid(otherUserId)
     ) {
       throw new BadRequestException({
-        message: "ID người dùng không hợp lệ",
+        message: 'ID người dùng không hợp lệ',
       });
     }
 
@@ -69,7 +69,7 @@ export class ChatService {
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         throw new NotFoundException({
-          message: "Không tìm thấy người dùng để tạo cuộc trò chuyện",
+          message: 'Không tìm thấy người dùng để tạo cuộc trò chuyện',
         });
       }
       throw error;
@@ -82,7 +82,7 @@ export class ChatService {
       return {
         statusCode: 200,
         body: {
-          message: "Cuộc trò chuyện đã tồn tại",
+          message: 'Cuộc trò chuyện đã tồn tại',
           chatId: existingChat._id,
         },
       };
@@ -94,7 +94,7 @@ export class ChatService {
     return {
       statusCode: 201,
       body: {
-        message: "Tạo cuộc trò chuyện mới thành công",
+        message: 'Tạo cuộc trò chuyện mới thành công',
         chatId: chat._id,
       },
     };
@@ -107,7 +107,7 @@ export class ChatService {
     const userId = user?._id;
     if (!userId) {
       throw new BadRequestException({
-        message: "Cần cung cấp ID người dùng",
+        message: 'Cần cung cấp ID người dùng',
       });
     }
 
@@ -141,13 +141,13 @@ export class ChatService {
           };
         } catch (error: unknown) {
           this.logUserLookupFailure(
-            "chat_user_lookup_failed",
+            'chat_user_lookup_failed',
             String(otherUserId),
             error,
             requestId,
           );
           return {
-            user: { _id: otherUserId, name: "Unknown User" },
+            user: { _id: otherUserId, name: 'Unknown User' },
             chat: {
               ...chat.toObject(),
               latestMessage: chat.latestMessage || null,
@@ -170,26 +170,26 @@ export class ChatService {
     const { chatId, text } = dto;
 
     if (!senderId) {
-      throw new UnauthorizedException({ message: "Không có quyền truy cập" });
+      throw new UnauthorizedException({ message: 'Không có quyền truy cập' });
     }
     if (!chatId) {
       throw new BadRequestException({
-        message: "Cần cung cấp chatId (ID cuộc trò chuyện)",
+        message: 'Cần cung cấp chatId (ID cuộc trò chuyện)',
       });
     }
     if (!Types.ObjectId.isValid(chatId)) {
-      throw new BadRequestException({ message: "chatId không hợp lệ" });
+      throw new BadRequestException({ message: 'chatId không hợp lệ' });
     }
     if (!text && !imageFile) {
       throw new BadRequestException({
-        message: "Cần có văn bản hoặc hình ảnh để gửi tin nhắn",
+        message: 'Cần có văn bản hoặc hình ảnh để gửi tin nhắn',
       });
     }
 
     const chat = await this.chatModel.findById(chatId).exec();
     if (!chat) {
       throw new NotFoundException({
-        message: "Không tìm thấy cuộc trò chuyện",
+        message: 'Không tìm thấy cuộc trò chuyện',
       });
     }
     const isUserInChat = chat.users.some(
@@ -197,7 +197,7 @@ export class ChatService {
     );
     if (!isUserInChat) {
       throw new ForbiddenException({
-        message: "Bạn không tham gia vào cuộc trò chuyện này",
+        message: 'Bạn không tham gia vào cuộc trò chuyện này',
       });
     }
     const otherUserId = chat.users.find(
@@ -205,7 +205,7 @@ export class ChatService {
     );
     if (!otherUserId) {
       throw new UnauthorizedException({
-        message: "Không tìm thấy người dùng khác",
+        message: 'Không tìm thấy người dùng khác',
       });
     }
 
@@ -223,12 +223,12 @@ export class ChatService {
         ...(uploadedImage
           ? {
               image: uploadedImage,
-              messageType: "image",
-              text: text || "",
+              messageType: 'image',
+              text: text || '',
             }
           : {
               text,
-              messageType: "text",
+              messageType: 'text',
             }),
       });
 
@@ -236,7 +236,7 @@ export class ChatService {
         chatId,
         {
           latestMessage: {
-            text: uploadedImage ? "Sent an image" : text,
+            text: uploadedImage ? 'Sent an image' : text,
             sender: senderId,
           },
           updatedAt: new Date(),
@@ -262,21 +262,21 @@ export class ChatService {
   ): Promise<{ messages: MessageDocument[]; user: unknown }> {
     const userId = user?._id;
     if (!userId) {
-      throw new UnauthorizedException({ message: "Không có quyền truy cập" });
+      throw new UnauthorizedException({ message: 'Không có quyền truy cập' });
     }
     if (!chatId) {
       throw new BadRequestException({
-        message: "Cần cung cấp chatId (ID cuộc trò chuyện)",
+        message: 'Cần cung cấp chatId (ID cuộc trò chuyện)',
       });
     }
     if (!Types.ObjectId.isValid(chatId)) {
-      throw new BadRequestException({ message: "chatId không hợp lệ" });
+      throw new BadRequestException({ message: 'chatId không hợp lệ' });
     }
 
     const chat = await this.chatModel.findById(chatId).exec();
     if (!chat) {
       throw new NotFoundException({
-        message: "Không tìm thấy cuộc trò chuyện",
+        message: 'Không tìm thấy cuộc trò chuyện',
       });
     }
     const isUserInChat = chat.users.some(
@@ -284,7 +284,7 @@ export class ChatService {
     );
     if (!isUserInChat) {
       throw new ForbiddenException({
-        message: "Bạn không tham gia vào cuộc trò chuyện này",
+        message: 'Bạn không tham gia vào cuộc trò chuyện này',
       });
     }
 
@@ -325,14 +325,14 @@ export class ChatService {
       );
       if (!otherUserId) {
         throw new BadRequestException({
-          message: "Không tìm thấy người dùng khác",
+          message: 'Không tìm thấy người dùng khác',
         });
       }
       return { messages, user: otherUser };
     } catch (error: unknown) {
       if (error instanceof BadRequestException) throw error;
       this.logUserLookupFailure(
-        "conversation_user_lookup_failed",
+        'conversation_user_lookup_failed',
         String(otherUserId),
         error,
         requestId,
@@ -340,7 +340,7 @@ export class ChatService {
       );
       return {
         messages,
-        user: { _id: otherUserId, name: "unknown User" },
+        user: { _id: otherUserId, name: 'unknown User' },
       };
     }
   }
@@ -357,9 +357,9 @@ export class ChatService {
       cleanup.push(this.imageService.remove(uploadedImage.publicId));
     }
     const results = await Promise.allSettled(cleanup);
-    const failures = results.filter((result) => result.status === "rejected");
+    const failures = results.filter((result) => result.status === 'rejected');
     if (failures.length) {
-      this.logger.error("message_rollback_failed", {
+      this.logger.error('message_rollback_failed', {
         messageId: savedMessage?._id?.toString(),
         imagePublicId: uploadedImage?.publicId,
         failureCount: failures.length,

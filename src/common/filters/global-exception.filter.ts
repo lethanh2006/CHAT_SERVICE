@@ -5,11 +5,11 @@ import {
   type ExceptionFilter,
   Injectable,
   PayloadTooLargeException,
-} from "@nestjs/common";
-import { HttpAdapterHost } from "@nestjs/core";
-import { normalizeRouteTemplate } from "@nrapp/observability";
-import type { RequestContext } from "../interfaces/request-context.interface";
-import { StructuredLoggerService } from "../observability/structured-logger.service";
+} from '@nestjs/common';
+import { HttpAdapterHost } from '@nestjs/core';
+import { normalizeRouteTemplate } from '@nrapp/observability';
+import type { RequestContext } from '../interfaces/request-context.interface';
+import { StructuredLoggerService } from '../observability/structured-logger.service';
 
 interface ErrorRequest {
   method?: string;
@@ -34,8 +34,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const normalized =
       exception instanceof PayloadTooLargeException
         ? new BadRequestException({
-            code: "PAYLOAD_TOO_LARGE",
-            message: "Ảnh không được vượt quá 5MB",
+            code: 'PAYLOAD_TOO_LARGE',
+            message: 'Ảnh không được vượt quá 5MB',
           })
         : exception;
     const result = this.logger.handleHttpException(normalized, {
@@ -52,10 +52,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   }
 
   private routeOf(request: ErrorRequest): string {
-    return typeof request.route?.path === "string"
-      ? normalizeRouteTemplate(
-          `${request.baseUrl ?? ""}${request.route.path}`,
-        )
-      : "unmatched";
+    return typeof request.route?.path === 'string'
+      ? normalizeRouteTemplate(`${request.baseUrl ?? ''}${request.route.path}`)
+      : 'unmatched';
   }
 }

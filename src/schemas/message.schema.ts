@@ -1,4 +1,4 @@
-import { Schema, Types, type HydratedDocument } from "mongoose";
+import { Schema, Types, type HydratedDocument } from 'mongoose';
 
 export interface MessageImage {
   url: string;
@@ -10,7 +10,7 @@ export class Message {
   sender: string;
   text?: string;
   image?: MessageImage;
-  messageType: "text" | "image";
+  messageType: 'text' | 'image';
   seen: boolean;
   seenAt?: Date | null;
   createdAt: Date;
@@ -23,7 +23,7 @@ export const MessageSchema = new Schema<Message>(
   {
     chatId: {
       type: Schema.Types.ObjectId,
-      ref: "Chat",
+      ref: 'Chat',
       required: true,
     },
     sender: { type: String, required: true },
@@ -34,14 +34,14 @@ export const MessageSchema = new Schema<Message>(
     },
     messageType: {
       type: String,
-      enum: ["text", "image"],
-      default: "text",
+      enum: ['text', 'image'],
+      default: 'text',
     },
     seen: { type: Boolean, default: false },
     seenAt: { type: Date, default: null },
   },
   {
-    collection: "messages",
+    collection: 'messages',
     timestamps: true,
   },
 );

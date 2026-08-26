@@ -1,16 +1,16 @@
-import { Controller, Get } from "@nestjs/common";
-import { HealthService, type ChatHealth } from "./health.service";
+import { Controller, Get } from '@nestjs/common';
+import { HealthService, type ChatHealth } from './health.service';
 
-@Controller("health")
+@Controller('health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
-  @Get(["", "live"])
+  @Get(['', 'live'])
   getLiveness(): ChatHealth {
     return this.healthService.getLiveness();
   }
 
-  @Get("ready")
+  @Get('ready')
   getReadiness(): ChatHealth {
     return this.healthService.getReadiness();
   }

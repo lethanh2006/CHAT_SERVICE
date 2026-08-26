@@ -1,13 +1,13 @@
-import { Injectable, type NestMiddleware } from "@nestjs/common";
+import { Injectable, type NestMiddleware } from '@nestjs/common';
 import {
   createRequestCorrelation,
   REQUEST_ID_HEADER,
   runWithLogContext,
-} from "@nrapp/observability";
-import type { NextFunction, Response } from "express";
-import type { RequestWithContext } from "../interfaces/request-context.interface";
+} from '@nrapp/observability';
+import type { NextFunction, Response } from 'express';
+import type { RequestWithContext } from '../interfaces/request-context.interface';
 
-export { REQUEST_ID_HEADER, SAFE_REQUEST_ID } from "@nrapp/observability";
+export { REQUEST_ID_HEADER, SAFE_REQUEST_ID } from '@nrapp/observability';
 
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
