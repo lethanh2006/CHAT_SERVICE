@@ -1,19 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import {
-  createAppLogger,
   handleOriginHttpException,
   type HttpBoundaryContext,
   type HttpBoundaryResult,
 } from '@nrapp/observability';
+import { appLogger } from './app-logger';
 
 export type LogDetails = Record<string, unknown>;
 
-export const chatAppLogger: ReturnType<typeof createAppLogger> =
-  createAppLogger({ serviceName: 'chat' });
-
 @Injectable()
 export class StructuredLoggerService {
-  private readonly logger = chatAppLogger;
+  private readonly logger = appLogger;
 
   info(event: string, details: LogDetails = {}): void {
     this.logger.info({ ...details, 'event.name': event }, event);
