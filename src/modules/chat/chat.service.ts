@@ -1,15 +1,16 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import axios from 'axios';
 import { Types, type Model } from 'mongoose';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { StructuredLoggerService } from '../../common/observability/structured-logger.service';
+import { toError } from '../../common/utils/error.util';
 import { Chat } from '../../schemas/chat.schema';
 import { Message, type MessageDocument } from '../../schemas/message.schema';
 import { ChatGateway } from './chat.gateway';
@@ -67,7 +68,7 @@ export class ChatService {
     try {
       await this.userClient.getUser(otherUserId, requestId);
     } catch (error: unknown) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
+      if (error instanceof NotFoundException) {
         throw new NotFoundException({
           message: 'Không tìm thấy người dùng để tạo cuộc trò chuyện',
         });
@@ -378,8 +379,8 @@ export class ChatService {
       requestId,
       chatId,
       userId,
-      status: axios.isAxiosError(error) ? error.response?.status : undefined,
-      message: axios.isAxiosError(error) ? error.message : String(error),
+      statusCode: error instanceof HttpException ? error.getStatus() : 502,
+      errorName: toError(error).name,
     });
   }
 }
