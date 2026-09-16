@@ -6,15 +6,15 @@ export interface MessageImage {
 }
 
 export class Message {
-  chatId: Types.ObjectId;
-  sender: string;
+  chatId!: Types.ObjectId;
+  sender!: string;
   text?: string;
   image?: MessageImage;
-  messageType: 'text' | 'image';
-  seen: boolean;
+  messageType!: 'text' | 'image';
+  seen!: boolean;
   seenAt?: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt!: Date;
+  updatedAt!: Date;
 }
 
 export type MessageDocument = HydratedDocument<Message>;

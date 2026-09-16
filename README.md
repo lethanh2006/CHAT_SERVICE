@@ -4,6 +4,9 @@ NestJS 11 service for one-to-one conversations, image messages and Socket.IO
 presence/events. MongoDB continues to use database `nrapp` and collections
 `chats` and `messages`, so no data migration is required.
 
+See [Luồng hoạt động tổng quan của chức năng chat](docs/chat-flow.md) for the
+frontend-to-backend flow, API examples and realtime events (Vietnamese).
+
 ## HTTP contract
 
 - `GET /health`, `GET /health/ready`, `GET /health/live`

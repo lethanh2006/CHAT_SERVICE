@@ -6,10 +6,10 @@ export interface LatestMessage {
 }
 
 export class Chat {
-  users: string[];
+  users!: string[];
   latestMessage?: LatestMessage;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt!: Date;
+  updatedAt!: Date;
 }
 
 export type ChatDocument = HydratedDocument<Chat>;

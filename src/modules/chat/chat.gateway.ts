@@ -29,7 +29,7 @@ export class ChatGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  private server: Server;
+  private server!: Server;
 
   private readonly userSocketMap = new Map<string, Set<string>>();
 
