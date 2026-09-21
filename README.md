@@ -6,6 +6,7 @@ presence/events. MongoDB continues to use database `nrapp` and collections
 
 See [Luồng hoạt động tổng quan của chức năng chat](docs/chat-flow.md) for the
 frontend-to-backend flow, API examples and realtime events (Vietnamese).
+See [COMMON.md](COMMON.md) for the shared HTTP flow and source layout.
 
 ## HTTP contract
 
@@ -32,7 +33,6 @@ npm install
 npm run dev
 npm run lint
 npm test
-npm run test:e2e
 npm run build
 npm run start:prod
 ```

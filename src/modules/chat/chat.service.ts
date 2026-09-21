@@ -8,9 +8,9 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
-import { toError } from '../../common/error.util';
-import { StructuredLoggerService } from '../../common/observability';
-import type { AuthenticatedUser } from '../../common/request-context';
+import { toError } from '../../common/utils/error.util';
+import { StructuredLoggerService } from '../../common/logging/logger';
+import type { AuthenticatedUser } from '../../common/interfaces/request-context.interface';
 import { Chat } from '../../schemas/chat.schema';
 import { Message, type MessageDocument } from '../../schemas/message.schema';
 import { ChatGateway } from './chat.gateway';

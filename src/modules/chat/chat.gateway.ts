@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { withMessageSpan } from '@nrapp/observability';
 import {
   type OnGatewayConnection,
   type OnGatewayDisconnect,
@@ -11,7 +10,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { StructuredLoggerService } from '../../common/observability';
+import { StructuredLoggerService } from '../../common/logging/logger';
 
 interface TypingPayload {
   chatId?: unknown;
@@ -76,70 +75,66 @@ export class ChatGateway
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Keep the existing Promise contract for socket handlers.
   async handleConnection(socket: Socket): Promise<void> {
-    await this.withSocketEventSpan('connect', () => {
-      const userId = this.getSocketUserId(socket);
-      if (!userId) return;
-      const sockets = this.userSocketMap.get(userId) ?? new Set<string>();
-      sockets.add(socket.id);
-      this.userSocketMap.set(userId, sockets);
-      this.emitOnlineUsers();
-      this.logger.info('socket_connected', { 'user.id': userId });
-    });
+    const userId = this.getSocketUserId(socket);
+    if (!userId) return;
+    const sockets = this.userSocketMap.get(userId) ?? new Set<string>();
+    sockets.add(socket.id);
+    this.userSocketMap.set(userId, sockets);
+    this.emitOnlineUsers();
+    this.logger.info('socket_connected', { 'user.id': userId });
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Keep the existing Promise contract for socket handlers.
   async handleDisconnect(socket: Socket): Promise<void> {
-    await this.withSocketEventSpan('disconnect', () => {
-      const userId = this.getSocketUserId(socket);
-      if (userId) {
-        const sockets = this.userSocketMap.get(userId);
-        sockets?.delete(socket.id);
-        if (!sockets?.size) this.userSocketMap.delete(userId);
-        this.emitOnlineUsers();
-      }
-      this.logger.info('socket_disconnected', {
-        ...(userId ? { 'user.id': userId } : {}),
-      });
+    const userId = this.getSocketUserId(socket);
+    if (userId) {
+      const sockets = this.userSocketMap.get(userId);
+      sockets?.delete(socket.id);
+      if (!sockets?.size) this.userSocketMap.delete(userId);
+      this.emitOnlineUsers();
+    }
+    this.logger.info('socket_disconnected', {
+      ...(userId ? { 'user.id': userId } : {}),
     });
   }
 
   @SubscribeMessage('typing')
+  // eslint-disable-next-line @typescript-eslint/require-await -- Keep the existing Promise contract for socket handlers.
   async handleTyping(
     socket: Socket,
     payload: TypingPayload = {},
   ): Promise<void> {
-    await this.withSocketEventSpan('typing', () => {
-      const { chatId, targetUserId } = payload;
-      if (typeof chatId !== 'string' || typeof targetUserId !== 'string') {
-        return;
-      }
+    const { chatId, targetUserId } = payload;
+    if (typeof chatId !== 'string' || typeof targetUserId !== 'string') {
+      return;
+    }
 
-      const receiverSocketIds = this.getReceiverSocketIds(targetUserId);
-      const senderUserId = this.getSocketUserId(socket);
-      if (receiverSocketIds.length && senderUserId) {
-        this.server
-          .to(receiverSocketIds)
-          .emit('userTyping', { chatId, userId: senderUserId });
-      }
-    });
+    const receiverSocketIds = this.getReceiverSocketIds(targetUserId);
+    const senderUserId = this.getSocketUserId(socket);
+    if (receiverSocketIds.length && senderUserId) {
+      this.server
+        .to(receiverSocketIds)
+        .emit('userTyping', { chatId, userId: senderUserId });
+    }
   }
 
   @SubscribeMessage('typingStop')
+  // eslint-disable-next-line @typescript-eslint/require-await -- Keep the existing Promise contract for socket handlers.
   async handleTypingStop(
     _socket: Socket,
     payload: TypingPayload = {},
   ): Promise<void> {
-    await this.withSocketEventSpan('typingStop', () => {
-      const { chatId, targetUserId } = payload;
-      if (typeof chatId !== 'string' || typeof targetUserId !== 'string') {
-        return;
-      }
+    const { chatId, targetUserId } = payload;
+    if (typeof chatId !== 'string' || typeof targetUserId !== 'string') {
+      return;
+    }
 
-      const receiverSocketIds = this.getReceiverSocketIds(targetUserId);
-      if (receiverSocketIds.length) {
-        this.server.to(receiverSocketIds).emit('userTypingStop', { chatId });
-      }
-    });
+    const receiverSocketIds = this.getReceiverSocketIds(targetUserId);
+    if (receiverSocketIds.length) {
+      this.server.to(receiverSocketIds).emit('userTypingStop', { chatId });
+    }
   }
 
   emitNewMessage(userId: string, message: unknown): void {
@@ -173,17 +168,5 @@ export class ChatGateway
     return typeof value === 'object' && value !== null && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : null;
-  }
-
-  private async withSocketEventSpan(
-    eventName: string,
-    callback: () => void,
-  ): Promise<void> {
-    await withMessageSpan(`socket.io ${eventName}`, {}, callback, {
-      attributes: {
-        'messaging.system': 'socket.io',
-        'messaging.operation.name': eventName,
-      },
-    });
   }
 }

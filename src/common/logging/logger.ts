@@ -1,7 +1,7 @@
 import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import {
   createAppLogger,
-  flushLoggerAndShutdownTelemetry,
+  flushLogger,
   handleOriginHttpException,
   type HttpBoundaryContext,
   type HttpBoundaryResult,
@@ -48,8 +48,8 @@ export class StructuredLoggerService {
 }
 
 @Injectable()
-export class TelemetryLifecycleService implements OnApplicationShutdown {
+export class LoggerLifecycleService implements OnApplicationShutdown {
   async onApplicationShutdown(): Promise<void> {
-    await flushLoggerAndShutdownTelemetry(appLogger, 3_000);
+    await flushLogger(appLogger);
   }
 }

@@ -203,7 +203,7 @@ Khi A gửi tin qua HTTP, backend lưu tin vào MongoDB rồi gọi `chatGateway
 
 - [Gateway UserController](../../gateway/src/modules/user/user.controller.ts): API danh sách người dùng cho FE.
 - [UserService](../../user/src/modules/user/user.service.ts): truy vấn danh sách và thông tin người dùng.
-- [Gateway JWT strategy](../../gateway/src/modules/auth/common/guard/jwt/jwt.strategy.ts): xác thực qua Auth Service.
+- [Gateway JWT strategy](../../gateway/src/common/security/jwt.strategy.ts): xác thực qua Auth Service.
 - [Gateway ChatController](../../gateway/src/modules/chat/chat.controller.ts): nhận các API chat từ FE.
 - [Gateway ChatService](../../gateway/src/modules/chat/chat.service.ts): chuyển request sang Chat Service.
 - [ChatAuthGuard](../src/common/guards/chat-auth.guard.ts): xác thực request tại Chat Service.

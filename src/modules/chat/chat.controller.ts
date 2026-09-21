@@ -13,8 +13,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
-import { ChatAuthGuard } from '../../common/chat-auth.guard';
-import type { RequestWithContext } from '../../common/request-context';
+import { ChatAuthGuard } from '../../common/guards/chat-auth.guard';
+import type { RequestWithContext } from '../../common/interfaces/request-context.interface';
 import { ChatService } from './chat.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { SendMessageDto } from './dto/send-message.dto';
