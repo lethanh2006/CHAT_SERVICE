@@ -2,7 +2,7 @@ import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ChatAuthGuard } from '../../common/guards/chat-auth.guard';
+import { ChatAuthGuard } from '../../common/chat-auth.guard';
 import { Chat, ChatSchema } from '../../schemas/chat.schema';
 import { Message, MessageSchema } from '../../schemas/message.schema';
 import { ChatController } from './chat.controller';

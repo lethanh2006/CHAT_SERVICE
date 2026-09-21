@@ -8,8 +8,8 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { normalizeRouteTemplate } from '@nrapp/observability';
-import type { RequestContext } from '../interfaces/request-context.interface';
-import { StructuredLoggerService } from '../observability/structured-logger.service';
+import { StructuredLoggerService } from './observability';
+import type { RequestContext } from './request-context';
 
 interface ErrorRequest {
   method?: string;

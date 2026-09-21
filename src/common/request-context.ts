@@ -1,5 +1,13 @@
 import type { Request } from 'express';
-import type { AuthenticatedUser } from './authenticated-user.interface';
+
+export interface AuthenticatedUser {
+  _id: string;
+  name?: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  [key: string]: unknown;
+}
 
 export interface RequestContext {
   requestId: string;

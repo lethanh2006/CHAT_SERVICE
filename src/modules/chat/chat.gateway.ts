@@ -11,7 +11,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { StructuredLoggerService } from '../../common/observability/structured-logger.service';
+import { StructuredLoggerService } from '../../common/observability';
 
 interface TypingPayload {
   chatId?: unknown;

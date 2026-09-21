@@ -8,8 +8,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { firstValueFrom } from 'rxjs';
-import { StructuredLoggerService } from '../../common/observability/structured-logger.service';
-import { toError } from '../../common/utils/error.util';
+import { toError } from '../../common/error.util';
+import { StructuredLoggerService } from '../../common/observability';
 
 @Injectable()
 export class UserClientService {

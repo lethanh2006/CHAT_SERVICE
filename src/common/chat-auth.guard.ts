@@ -6,9 +6,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import type { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
-import type { RequestWithContext } from '../interfaces/request-context.interface';
-import { GatewaySignatureService } from '../security/gateway-signature.service';
+import { GatewaySignatureService } from './gateway-signature.service';
+import type { AuthenticatedUser, RequestWithContext } from './request-context';
 
 @Injectable()
 export class ChatAuthGuard implements CanActivate {

@@ -7,7 +7,7 @@ import {
 import type { ConfigService } from '@nestjs/config';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { of, throwError } from 'rxjs';
-import type { StructuredLoggerService } from '../../common/observability/structured-logger.service';
+import type { StructuredLoggerService } from '../../common/observability';
 import { UserClientService } from './user-client.service';
 
 describe('Chat UserClientService', () => {
