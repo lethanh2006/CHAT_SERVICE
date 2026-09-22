@@ -45,3 +45,6 @@ export const MessageSchema = new Schema<Message>(
     timestamps: true,
   },
 );
+
+MessageSchema.index({ chatId: 1, createdAt: 1 });
+MessageSchema.index({ chatId: 1, seen: 1, sender: 1 });

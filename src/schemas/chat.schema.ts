@@ -27,3 +27,5 @@ export const ChatSchema = new Schema<Chat>(
     timestamps: true,
   },
 );
+
+ChatSchema.index({ users: 1, updatedAt: -1 });
