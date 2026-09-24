@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
+import { performance } from 'node:perf_hooks';
 import { toError } from '../../common/utils/error.util';
 import { StructuredLoggerService } from '../../common/logging/logger';
 import type { AuthenticatedUser } from '../../common/interfaces/request-context.interface';
@@ -27,8 +28,20 @@ export interface CreateChatResult {
   };
 }
 
+const CHAT_LIST_CACHE_TTL_MS = 5_000;
+
 @Injectable()
 export class ChatService {
+  private readonly chatListCache = new Map<
+    string,
+    { expiresAt: number; value: { chats: unknown[] } }
+  >();
+  private readonly pendingChatListReads = new Map<
+    string,
+    Promise<{ chats: unknown[] }>
+  >();
+  private chatListGeneration = 0;
+
   constructor(
     @InjectModel(Chat.name) private readonly chatModel: Model<Chat>,
     @InjectModel(Message.name) private readonly messageModel: Model<Message>,
@@ -92,6 +105,7 @@ export class ChatService {
     const chat = await this.chatModel.create({
       users: [userId, otherUserId],
     });
+    this.invalidateChatLists();
     return {
       statusCode: 201,
       body: {
@@ -112,54 +126,189 @@ export class ChatService {
       });
     }
 
+    const key = userId.toString();
+    const generation = this.chatListGeneration;
+    const cacheKey = `${generation}:${key}`;
+    const cached = this.chatListCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    if (cached) this.chatListCache.delete(cacheKey);
+
+    const pending = this.pendingChatListReads.get(cacheKey);
+    if (pending) return pending;
+    if (this.pendingChatListReads.size >= 128) {
+      return this.loadAllChats(key, requestId);
+    }
+
+    const read = this.loadAllChats(key, requestId);
+    this.pendingChatListReads.set(cacheKey, read);
+    try {
+      const value = await read;
+      if (generation === this.chatListGeneration) {
+        this.rememberChatList(cacheKey, value);
+      }
+      return value;
+    } finally {
+      if (this.pendingChatListReads.get(cacheKey) === read) {
+        this.pendingChatListReads.delete(cacheKey);
+      }
+    }
+  }
+
+  private rememberChatList(key: string, value: { chats: unknown[] }): void {
+    if (this.chatListCache.size >= 256) {
+      const oldestKey: string | undefined = Array.from(
+        this.chatListCache.keys(),
+      )[0];
+      if (oldestKey !== undefined) this.chatListCache.delete(oldestKey);
+    }
+    this.chatListCache.set(key, {
+      expiresAt: Date.now() + CHAT_LIST_CACHE_TTL_MS,
+      value,
+    });
+  }
+
+  private invalidateChatLists(): void {
+    // A single service replica can invalidate synchronously; TTL bounds any external write lag.
+    this.chatListGeneration += 1;
+    this.chatListCache.clear();
+  }
+
+  private async loadAllChats(
+    userId: string,
+    requestId?: string,
+  ): Promise<{ chats: unknown[] }> {
+    const started = performance.now();
+    const findStarted = performance.now();
     const chats = await this.chatModel
       .find({ users: userId })
       .sort({ updatedAt: -1 })
+      .lean()
       .exec();
-    const chatWithUserData = await Promise.all(
-      chats.map(async (chat) => {
-        const otherUserId = chat.users.find(
-          (id) => id.toString() !== userId.toString(),
-        );
-        const unseenCount = await this.messageModel.countDocuments({
-          chatId: chat._id,
-          sender: { $ne: userId },
-          seen: false,
-        });
+    const findMs = performance.now() - findStarted;
+    if (chats.length === 0) {
+      this.logChatListPerformance(requestId, 0, findMs, 0, 0, started);
+      return { chats: [] };
+    }
 
-        try {
-          const otherUser = await this.userClient.getUser(
-            String(otherUserId),
-            requestId,
-          );
-          return {
-            user: otherUser,
-            chat: {
-              ...chat.toObject(),
-              latestMessage: chat.latestMessage || null,
-              unseenCount,
+    const otherUserIds = [
+      ...new Set(
+        chats
+          .map((chat) =>
+            chat.users.find((id) => id.toString() !== userId.toString()),
+          )
+          .filter((id): id is string => typeof id === 'string'),
+      ),
+    ];
+    const [unseenResult, userResult] = await Promise.all([
+      this.timeStage(() =>
+        this.messageModel
+          .aggregate<{ _id: Types.ObjectId; count: number }>([
+            {
+              $match: {
+                chatId: { $in: chats.map((chat) => chat._id) },
+                sender: { $ne: userId },
+                seen: false,
+              },
             },
-          };
-        } catch (error: unknown) {
-          this.logUserLookupFailure(
-            'chat_user_lookup_failed',
-            String(otherUserId),
-            error,
-            requestId,
-          );
-          return {
-            user: { _id: otherUserId, name: 'Unknown User' },
-            chat: {
-              ...chat.toObject(),
-              latestMessage: chat.latestMessage || null,
-              unseenCount,
-            },
-          };
-        }
-      }),
+            { $group: { _id: '$chatId', count: { $sum: 1 } } },
+          ])
+          .exec(),
+      ),
+      this.timeStage(() =>
+        this.userClient
+          .getUsers(otherUserIds, requestId)
+          .catch((error: unknown) => {
+            return { error };
+          }),
+      ),
+    ]);
+    const unseenCounts = unseenResult.value;
+    const directoryUsers = userResult.value;
+
+    const unseenCountByChatId = new Map(
+      unseenCounts.map((row) => [String(row._id), row.count]),
     );
+    const lookupError = Array.isArray(directoryUsers)
+      ? undefined
+      : directoryUsers.error;
+    const usersById = new Map<string, Record<string, unknown>>();
+    if (Array.isArray(directoryUsers)) {
+      for (const value of directoryUsers) {
+        if (typeof value === 'object' && value !== null && '_id' in value) {
+          const directoryUser = value as Record<string, unknown>;
+          usersById.set(String(directoryUser._id), directoryUser);
+        }
+      }
+    }
 
+    const chatWithUserData = chats.map((chat) => {
+      const otherUserId = chat.users.find(
+        (id) => id.toString() !== userId.toString(),
+      );
+      const otherUserKey = String(otherUserId);
+      const directoryUser = usersById.get(otherUserKey);
+      let user: unknown;
+      if (directoryUser) {
+        // Preserve the existing { user: { user: ... } } response shape.
+        user = { user: directoryUser };
+      } else {
+        this.logUserLookupFailure(
+          'chat_user_lookup_failed',
+          otherUserKey,
+          lookupError ?? new NotFoundException('Không tìm thấy người dùng'),
+          requestId,
+        );
+        user = { _id: otherUserId, name: 'Unknown User' };
+      }
+
+      return {
+        user,
+        chat: {
+          ...chat,
+          latestMessage: chat.latestMessage || null,
+          unseenCount: unseenCountByChatId.get(String(chat._id)) ?? 0,
+        },
+      };
+    });
+
+    this.logChatListPerformance(
+      requestId,
+      chats.length,
+      findMs,
+      unseenResult.durationMs,
+      userResult.durationMs,
+      started,
+    );
     return { chats: chatWithUserData };
+  }
+
+  private async timeStage<T>(
+    operation: () => Promise<T>,
+  ): Promise<{ value: T; durationMs: number }> {
+    const started = performance.now();
+    const value = await operation();
+    return { value, durationMs: performance.now() - started };
+  }
+
+  private logChatListPerformance(
+    requestId: string | undefined,
+    chatCount: number,
+    findMs: number,
+    unseenAggregateMs: number,
+    userBatchMs: number,
+    started: number,
+  ): void {
+    const totalMs = performance.now() - started;
+    const logMinMs = Number(process.env.CHAT_LIST_PERF_LOG_MIN_MS || 0);
+    if (logMinMs <= 0 || totalMs < logMinMs) return;
+    this.logger.info('chat_list.perf', {
+      request_id: requestId,
+      chat_count: chatCount,
+      find_ms: Math.round(findMs * 100) / 100,
+      unseen_aggregate_ms: Math.round(unseenAggregateMs * 100) / 100,
+      user_batch_ms: Math.round(userBatchMs * 100) / 100,
+      total_ms: Math.round(totalMs * 100) / 100,
+    });
   }
 
   async sendMessage(
@@ -244,6 +393,7 @@ export class ChatService {
         },
         { new: true },
       );
+      this.invalidateChatLists();
     } catch (error: unknown) {
       await this.rollbackFailedMessage(savedMessage, uploadedImage);
       throw error;
@@ -304,6 +454,7 @@ export class ChatService {
       },
       { seen: true, seenAt: new Date() },
     );
+    this.invalidateChatLists();
     const messages = await this.messageModel
       .find({ chatId })
       .sort({ createdAt: 1 })

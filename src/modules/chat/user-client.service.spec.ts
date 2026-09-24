@@ -6,15 +6,19 @@ import {
 } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { AxiosError, type AxiosResponse } from 'axios';
-import { of, throwError } from 'rxjs';
+import { from, of, throwError } from 'rxjs';
 import type { StructuredLoggerService } from '../../common/logging/logger';
 import { UserClientService } from './user-client.service';
 
 describe('Chat UserClientService', () => {
   const httpGet = jest.fn();
+  const httpPost = jest.fn();
   const logInfo = jest.fn();
   const logWarn = jest.fn();
-  const httpService = { get: httpGet } as unknown as HttpService;
+  const httpService = {
+    get: httpGet,
+    post: httpPost,
+  } as unknown as HttpService;
   const config = {
     get: jest.fn((key: string) => {
       if (key === 'USER_SERVICE') return 'http://user:5000/';
@@ -55,6 +59,85 @@ describe('Chat UserClientService', () => {
         requestId: 'req-chat-1',
         statusCode: 200,
       }),
+    );
+  });
+
+  it('batch lookup dùng public-batch và gửi một request-id', async () => {
+    const users = [{ _id: 'user-1', username: 'one' }];
+    httpPost.mockReturnValue(
+      of({ status: 200, data: { users } } as AxiosResponse),
+    );
+    const service = new UserClientService(httpService, config, logger);
+
+    await expect(
+      service.getUsers(['user-1', 'user-2'], 'req-chat-batch'),
+    ).resolves.toEqual(users);
+
+    expect(httpPost).toHaveBeenCalledWith(
+      'http://user:5000/api/user/internal/public-batch',
+      { ids: ['user-1', 'user-2'] },
+      {
+        headers: { 'x-request-id': 'req-chat-batch' },
+        timeout: 1400,
+      },
+    );
+    expect(logInfo).toHaveBeenCalledWith(
+      'user_service_request_completed',
+      expect.objectContaining({
+        requestId: 'req-chat-batch',
+        operation: 'get_users',
+        statusCode: 200,
+        userCount: 1,
+      }),
+    );
+  });
+
+  it('coalesces only overlapping public-batch reads with the same ID list', async () => {
+    const users = [{ _id: 'user-1', username: 'one' }];
+    let resolveResponse!: (response: AxiosResponse) => void;
+    httpPost.mockReturnValue(
+      from(
+        new Promise<AxiosResponse>((resolve) => {
+          resolveResponse = resolve;
+        }),
+      ),
+    );
+    const service = new UserClientService(httpService, config, logger);
+
+    const first = service.getUsers(['user-1', 'user-2'], 'req-chat-1');
+    const second = service.getUsers(['user-1', 'user-2'], 'req-chat-2');
+    expect(httpPost).toHaveBeenCalledTimes(1);
+
+    resolveResponse({ status: 200, data: { users } } as AxiosResponse);
+    await expect(Promise.all([first, second])).resolves.toEqual([users, users]);
+
+    await service.getUsers(['user-1', 'user-2'], 'req-chat-3');
+    expect(httpPost).toHaveBeenCalledTimes(2);
+  });
+
+  it('splits public-batch lookups at the service limit of 100 IDs', async () => {
+    httpPost.mockImplementation((_url: string, body: { ids: string[] }) =>
+      of({
+        status: 200,
+        data: { users: body.ids.map((_id) => ({ _id })) },
+      } as AxiosResponse),
+    );
+    const service = new UserClientService(httpService, config, logger);
+    const ids = Array.from({ length: 101 }, (_, index) => `user-${index}`);
+
+    await expect(service.getUsers(ids)).resolves.toHaveLength(101);
+    expect(httpPost).toHaveBeenCalledTimes(2);
+    expect(httpPost).toHaveBeenNthCalledWith(
+      1,
+      'http://user:5000/api/user/internal/public-batch',
+      { ids: ids.slice(0, 100) },
+      { headers: undefined, timeout: 1400 },
+    );
+    expect(httpPost).toHaveBeenNthCalledWith(
+      2,
+      'http://user:5000/api/user/internal/public-batch',
+      { ids: ['user-100'] },
+      { headers: undefined, timeout: 1400 },
     );
   });
 
