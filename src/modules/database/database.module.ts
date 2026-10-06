@@ -9,7 +9,7 @@ import { MongooseModule } from '@nestjs/mongoose';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         uri: configService.getOrThrow<string>('MONGO_URL'),
-        dbName: 'nrapp',
+        dbName: configService.get<string>('MONGO_DB_NAME') || 'nrapp',
       }),
     }),
   ],
